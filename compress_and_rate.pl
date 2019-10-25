@@ -1,12 +1,25 @@
 #!/usr/bin/perl
 
+use warnings;
+use strict;
+
 use Data::Dumper;
 use Time::HiRes qw(time);
 use Text::CSV_XS "csv";
 
 use Capture::Tiny ':all';
 
-my $all_data = {};
+my @all_data = ();
+my @headers = (
+  'lang',
+  'repo',
+  'time',
+  'compression',
+  'size_before',
+  'size_after',
+);
+
+push @all_data, [@headers];
 
 opendir(TARS, 'tars/');
 while(my $tar = readdir(TARS)){
@@ -15,266 +28,31 @@ while(my $tar = readdir(TARS)){
   next unless $tar =~ /(.*)\_(.*)\.tar$/;
   my ($repo, $lang) = ($1, $2);
 
-  for my $rating ('1', '6', '9'){
-    my $start_time = time;
-    my $stdout, $stderr;
-    ($stdout, $stderr) = capture {
-      system("gzip -k -f -v -$rating tars/$tar > /dev/null")
-    };
-    $all_data->{$repo}->{"${lang}_run_time_$rating"} = time - $start_time;
+  my $data = {};
 
-    # Parse
-    $stderr =~ /([0-9]{1,2}\.[0-9])%/;
-    $all_data->{$repo}->{"${lang}_compression_$rating"} = $1;
-  }
+  $data->{lang} = $lang;
+  $data->{repo} = $repo;
+
+  my $start_time = time;
+  my ($stdout, $stderr);
+  ($stdout, $stderr) = capture {
+    system("gzip -k -f -v -1 tars/$tar > /dev/null")
+  };
+  $data->{time} = time - $start_time;
+
+  # Parse
+  $stderr =~ /([0-9]{1,2}\.[0-9])%/;
+  $data->{compression} = $1;
+
+  # Get pre/post sizes
+  `ls -l tars/$tar` =~ /^.*? .*? .*? .*? (.*?) /;
+  $data->{size_before} = $1;
+
+  `ls -l tars/$tar.gz` =~ /^.*? .*? .*? .*? (.*?) /;
+  $data->{size_after} = $1;
+
+  push @all_data, [map { $data->{$_} } @headers];
 }
 
-# TODO: Autogenerate this somehow
-my @headers = (
-  "repository",
-  "markdown_run_time_1",
-  "markdown_run_time_6",
-  "markdown_run_time_9",
-  "markdown_compression_1",
-  "markdown_compression_6",
-  "markdown_compression_9",
-  "css_run_time_1",
-  "css_run_time_6",
-  "css_run_time_9",
-  "css_compression_1",
-  "css_compression_6",
-  "css_compression_9",
-  "perl_run_time_1",
-  "perl_run_time_6",
-  "perl_run_time_9",
-  "perl_compression_1",
-  "perl_compression_6",
-  "perl_compression_9",
-  "html_run_time_1",
-  "html_run_time_6",
-  "html_run_time_9",
-  "html_compression_1",
-  "html_compression_6",
-  "html_compression_9",
-  "js_run_time_1",
-  "js_run_time_6",
-  "js_run_time_9",
-  "js_compression_1",
-  "js_compression_6",
-  "js_compression_9",
-  "c_run_time_1",
-  "c_run_time_6",
-  "c_run_time_9",
-  "c_compression_1",
-  "c_compression_6",
-  "c_compression_9",
-  "cpp_run_time_1",
-  "cpp_run_time_6",
-  "cpp_run_time_9",
-  "cpp_compression_1",
-  "cpp_compression_6",
-  "cpp_compression_9",
-  "java_run_time_1",
-  "java_run_time_6",
-  "java_run_time_9",
-  "java_compression_1",
-  "java_compression_6",
-  "java_compression_9",
-  "json_run_time_1",
-  "json_run_time_6",
-  "json_run_time_9",
-  "json_compression_1",
-  "json_compression_6",
-  "json_compression_9",
-  "shell_run_time_1",
-  "shell_run_time_6",
-  "shell_run_time_9",
-  "shell_compression_1",
-  "shell_compression_6",
-  "shell_compression_9",
-  "php_run_time_1",
-  "php_run_time_6",
-  "php_run_time_9",
-  "php_compression_1",
-  "php_compression_6",
-  "php_compression_9",
-  "hask_run_time_1",
-  "hask_run_time_6",
-  "hask_run_time_9",
-  "hask_compression_1",
-  "hask_compression_6",
-  "hask_compression_9",
-  "d_run_time_1",
-  "d_run_time_6",
-  "d_run_time_9",
-  "d_compression_1",
-  "d_compression_6",
-  "d_compression_9",
-  "dart_run_time_1",
-  "dart_run_time_6",
-  "dart_run_time_9",
-  "dart_compression_1",
-  "dart_compression_6",
-  "dart_compression_9",
-  "ps_run_time_1",
-  "ps_run_time_6",
-  "ps_run_time_9",
-  "ps_compression_1",
-  "ps_compression_6",
-  "ps_compression_9",
-  "lua_run_time_1",
-  "lua_run_time_6",
-  "lua_run_time_9",
-  "lua_compression_1",
-  "lua_compression_6",
-  "lua_compression_9",
-  "sql_run_time_1",
-  "sql_run_time_6",
-  "sql_run_time_9",
-  "sql_compression_1",
-  "sql_compression_6",
-  "sql_compression_9",
-  "nim_run_time_1",
-  "nim_run_time_6",
-  "nim_run_time_9",
-  "nim_compression_1",
-  "nim_compression_6",
-  "nim_compression_9",
-  "scala_run_time_1",
-  "scala_run_time_6",
-  "scala_run_time_9",
-  "scala_compression_1",
-  "scala_compression_6",
-  "scala_compression_9",
-  "clojure_run_time_1",
-  "clojure_run_time_6",
-  "clojure_run_time_9",
-  "clojure_compression_1",
-  "clojure_compression_6",
-  "clojure_compression_9",
-  "swift_run_time_1",
-  "swift_run_time_6",
-  "swift_run_time_9",
-  "swift_compression_1",
-  "swift_compression_6",
-  "swift_compression_9",
-  "batch_run_time_1",
-  "batch_run_time_6",
-  "batch_run_time_9",
-  "batch_compression_1",
-  "batch_compression_6",
-  "batch_compression_9",
-  "s_run_time_1",
-  "s_run_time_6",
-  "s_run_time_9",
-  "s_compression_1",
-  "s_compression_6",
-  "s_compression_9",
-  "rust_run_time_1",
-  "rust_run_time_6",
-  "rust_run_time_9",
-  "rust_compression_1",
-  "rust_compression_6",
-  "rust_compression_9",
-  "text_run_time_1",
-  "text_run_time_6",
-  "text_run_time_9",
-  "text_compression_1",
-  "text_compression_6",
-  "text_compression_9",
-  "vimscript_run_time_1",
-  "vimscript_run_time_6",
-  "vimscript_run_time_9",
-  "vimscript_compression_1",
-  "vimscript_compression_6",
-  "vimscript_compression_9",
-  "python_run_time_1",
-  "python_run_time_6",
-  "python_run_time_9",
-  "python_compression_1",
-  "python_compression_6",
-  "python_compression_9",
-  "xml_run_time_1",
-  "xml_run_time_6",
-  "xml_run_time_9",
-  "xml_compression_1",
-  "xml_compression_6",
-  "xml_compression_9",
-  "html_run_time_1",
-  "html_run_time_6",
-  "html_run_time_9",
-  "html_compression_1",
-  "html_compression_6",
-  "html_compression_9",
-  "go_run_time_1",
-  "go_run_time_6",
-  "go_run_time_9",
-  "go_compression_1",
-  "go_compression_6",
-  "go_compression_9",
-  "yaml_run_time_1",
-  "yaml_run_time_6",
-  "yaml_run_time_9",
-  "yaml_compression_1",
-  "yaml_compression_6",
-  "yaml_compression_9",
-  "toml_run_time_1",
-  "toml_run_time_6",
-  "toml_run_time_9",
-  "toml_compression_1",
-  "toml_compression_6",
-  "toml_compression_9",
-  "json_run_time_1",
-  "json_run_time_6",
-  "json_run_time_9",
-  "json_compression_1",
-  "json_compression_6",
-  "json_compression_9",
-  "ruby_run_time_1",
-  "ruby_run_time_6",
-  "ruby_run_time_9",
-  "ruby_compression_1",
-  "ruby_compression_6",
-  "ruby_compression_9",
-  "java_run_time_1",
-  "java_run_time_6",
-  "java_run_time_9",
-  "java_compression_1",
-  "java_compression_6",
-  "java_compression_9",
-  "kotlin_run_time_1",
-  "kotlin_run_time_6",
-  "kotlin_run_time_9",
-  "kotlin_compression_1",
-  "kotlin_compression_6",
-  "kotlin_compression_9",
-  "csharp_run_time_1",
-  "csharp_run_time_6",
-  "csharp_run_time_9",
-  "csharp_compression_1",
-  "csharp_compression_6",
-  "csharp_compression_9",
-  "c_run_time_1",
-  "c_run_time_6",
-  "c_run_time_9",
-  "c_compression_1",
-  "c_compression_6",
-  "c_compression_9",
-);
-
-my $_all_data = [ 
-  map { 
-    {repository => $_, %{$all_data->{$_}}}
-   } keys %$all_data
-];
-
-my $csv = [[@headers]];
-for my $row_data (@$_all_data){
-  my @row = ();
-  for my $header (@headers){
-    push @row, $row_data->{$header};
-  }
-  push @$csv, \@row;
-}
-
-csv(in => $csv, out => 'results.csv', sep_char => ',');
+my $filename = "results_" . time . ".csv";
+csv(in => \@all_data, out => $filename, sep_char => ',');
